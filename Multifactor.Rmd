@@ -1,0 +1,139 @@
+---
+title: "Multivariate MCA"
+author: "Susan Holmes"
+date: "April 21, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Load the data : supposing it is in the data directory
+
+
+This is how we read in the data:
+(your file will be in a different place)
+```{r}
+CP=read.csv("./data/CP1_Alla.csv",stringsAsFactors = TRUE,header=TRUE)
+```
+
+```{r}
+CPb=CP
+CPb$LT=as.factor(CP$LT)
+CP.tab=xtabs(Frequency~Lamin+Chromatin+LT+Type,data=CPb)
+CP.tab=xtabs(Frequency~Lamin+Chromatin+LT+Type,data=CPb)
+freqdata=data.frame(CP.tab)
+```
+A little testing using a glm for counts (rare)
+```{r}
+model=glm(Freq~Type,family=poisson,data=freqdata)
+anova(model,test="Chisq")
+fullmodel=glm(Freq~Type+Lamin+Chromatin,family=poisson,data=freqdata)
+anova(fullmodel,test="Chisq")
+```
+
+Not much difference between the two types, but significance for Lamin
+and Chromatin.
+
+
+
+```{r}
+attach(freqdata)
+xtabA <- tapply(Freq,list(Type,Lamin,Chromatin,LT),c)
+detach(freqdata)
+ftab=ftable(xtabA)
+ftab
+```
+
+You can do a whole set of independence tests by doing:
+```{r}
+xtabA[1,,,]
+mantelhaen.test(xtabA[1,,,])
+xtabA[2,,,]
+mantelhaen.test(xtabA[2,,,])
+```
+
+We see the top one is significant the bottom one less so,
+you can do the others in the same way, but this does not show all the
+dimensions of variation.
+
+You'll need some new packages to install:
+```{r, eval=FALSE}
+install.packages(c("ade4","factoextra","reshape","FactoMineR","vcd"))
+```
+
+This plot shows the cells in the table that are not 
+as they would have been under independence, red low, blue high.
+```{r mosaicplot}
+library(vcd)
+mosaic(CP.tab,shade=TRUE)
+```
+It's hard to read, so we're going to do multifactorial analyses
+(a sort of PCA for contingency tables)
+
+```{r}
+library(ade4)
+library(reshape)
+library(FactoMineR)
+library(factoextra)
+disj=tab.disjonctif(freqdata[,-5])
+expanded=untable(disj,num=freqdata[,5])
+##Need different column names for all categories
+colnames(expanded)<-c("Lam_Abs","Lam_Cont","Lam_Deg","Chrom_Abs","Chrom_Base","Chrom_Deg","LT0","LT1","CP1","Lucif")
+burtdf=as.data.frame(expanded)
+rownames(burtdf)=paste("r",1:454,sep="")
+```
+
+```{r mca1}
+bbcoa <- dudi.coa(burtdf,scannf=FALSE,nf=4)
+s.arrow(bbcoa$c1,boxes=FALSE)
+s.arrow(bbcoa$c1[,3:4],boxes=FALSE)
+```
+
+
+
+```{r fancierbiplots}
+fviz_ca_biplot(bbcoa, repel = FALSE)
+fviz_ca_biplot(bbcoa, repel = TRUE)
+fviz_ca_biplot(bbcoa, repel = FALSE,axes=c(3,4))
+```
+
+## New idea : separate Luciferase and CP1
+
+```{r lucif}
+Lucifonly=burtdf[burtdf[,10]==1,-c(9,10)]
+Lucoa <- dudi.coa(Lucifonly,scannf=FALSE,nf=4)
+s.arrow(Lucoa$c1,boxes=FALSE)
+```
+
+```{r CP1}
+CP1only=burtdf[burtdf[,9]==1,-c(9,10)]
+CP1coa <- dudi.coa(CP1only,scannf=FALSE,nf=4)
+s.arrow(CP1coa$c1,boxes=FALSE)
+```
+
+```{r sidebyside}
+par(mfrow=c(1,2))
+s.arrow(Lucoa$c1,boxes=FALSE)
+s.arrow(CP1coa$c1,boxes=FALSE)
+par(mfrow=c(1,1))
+```
+So not to be confused by a simple change in sign on the second
+axis (which is meaningless),we switch those coefficients.
+
+```{r}
+CP1coa$c1[,2]=-CP1coa$c1[,2]
+par(mfrow=c(1,2))
+s.arrow(Lucoa$c1,boxes=FALSE)
+s.arrow(CP1coa$c1,boxes=FALSE)
+par(mfrow=c(1,1))
+
+```
+
+There seems to be unfortunately very little difference in what is going on in the two dynamics, except things are more gradual in the CP1
+case as more of the states "are intermediary".
+
+Not quite sure about the inversion of Chrom_Abs and Lam_Abs.
+
+
