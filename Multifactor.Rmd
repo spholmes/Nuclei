@@ -131,9 +131,4 @@ par(mfrow=c(1,1))
 
 ```
 
-There seems to be unfortunately very little difference in what is going on in the two dynamics, except things are more gradual in the CP1
-case as more of the states "are intermediary".
-
-Not quite sure about the inversion of Chrom_Abs and Lam_Abs.
-
 
